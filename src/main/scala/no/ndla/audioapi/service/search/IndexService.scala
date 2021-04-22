@@ -77,7 +77,8 @@ trait IndexService {
       var numIndexed = 0
       getRanges.map(ranges => {
         ranges.foreach(range => {
-          val numberInBulk = indexDocuments(repository.documentsWithIdBetween(range._1, range._2), indexName)
+          val documentsToIndex = repository.documentsWithIdBetween(range._1, range._2)
+          val numberInBulk = documentsToIndex.flatMap(indexDocuments(_, indexName))
           numberInBulk match {
             case Success(num) => numIndexed += num
             case Failure(f)   => return Failure(f)
@@ -88,14 +89,19 @@ trait IndexService {
     }
 
     def getRanges: Try[List[(Long, Long)]] = {
-      Try {
-        val (minId, maxId) = repository.minMaxId
-        Seq
-          .range(minId, maxId + 1)
-          .grouped(AudioApiProperties.IndexBulkSize)
-          .map(group => (group.head, group.last))
-          .toList
+      val minMaxT = repository.minMaxId
+      minMaxT.flatMap {
+        case (minId, maxId) => {
+          Try {
+            Seq
+              .range(minId, maxId + 1)
+              .grouped(AudioApiProperties.IndexBulkSize)
+              .map(group => (group.head, group.last))
+              .toList
+          }
+        }
       }
+
     }
 
     def indexDocuments(contents: Seq[D], indexName: String): Try[Int] = {
