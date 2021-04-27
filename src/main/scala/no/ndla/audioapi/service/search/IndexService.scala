@@ -36,7 +36,7 @@ trait IndexService {
     val repository: Repository[D]
 
     def getMapping: MappingDefinition
-    def createIndexRequests(domainModel: D, indexName: String): Seq[IndexRequest]
+    def createIndexRequests(domainModel: D, indexName: String): Try[Seq[IndexRequest]]
 
     private def createIndexIfNotExists() = getAliasTarget.map {
       case Some(index) => Success(index)
@@ -46,7 +46,7 @@ trait IndexService {
     def indexDocument(imported: D): Try[D] = {
       for {
         _ <- createIndexIfNotExists()
-        requests = createIndexRequests(imported, searchIndex)
+        requests <- createIndexRequests(imported, searchIndex)
         _ <- executeRequests(requests)
       } yield imported
     }

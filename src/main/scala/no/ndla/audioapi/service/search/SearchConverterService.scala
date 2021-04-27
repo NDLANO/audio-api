@@ -14,21 +14,43 @@ import no.ndla.audioapi.model.Language
 import no.ndla.audioapi.model.domain.{AudioMetaInformation, SearchResult, SearchableTag}
 import no.ndla.audioapi.model.domain
 import no.ndla.audioapi.model.api
+import no.ndla.audioapi.model.api.ElasticIndexingException
 import no.ndla.audioapi.model.search.{
   LanguageValue,
   SearchableAudioInformation,
   SearchableLanguageList,
-  SearchableLanguageValues
+  SearchableLanguageValues,
+  SearchableSeries
 }
 import no.ndla.audioapi.service.ConverterService
 import no.ndla.mapping.ISO639
 import no.ndla.network.ApplicationUrl
+
+import scala.util.{Failure, Success, Try}
 
 trait SearchConverterService {
   this: ConverterService =>
   val searchConverterService: SearchConverterService
 
   class SearchConverterService extends LazyLogging {
+
+    def asSearchableSeries(s: domain.Series): Try[SearchableSeries] = {
+      s.id match {
+        case None =>
+          Failure(
+            ElasticIndexingException(
+              s"Could not build indexable object for series '${s.toString}', this is a bug."
+            ))
+        case Some(id) =>
+          Success(
+            SearchableSeries(
+              id = id.toString,
+              titles = SearchableLanguageValues(s.title.map(t => LanguageValue(t.language, t.title))),
+              episodes = Seq.empty
+            )
+          )
+      }
+    }
 
     def asSearchableAudioInformation(ai: AudioMetaInformation): SearchableAudioInformation = {
       val metaWithAgreement = converterService.withAgreementCopyright(ai)

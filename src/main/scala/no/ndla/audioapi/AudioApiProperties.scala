@@ -51,6 +51,8 @@ object AudioApiProperties extends LazyLogging {
   val RunWithSignedSearchRequests: Boolean = propOrElse("RUN_WITH_SIGNED_SEARCH_REQUESTS", "true").toBoolean
   val SearchIndex: String = propOrElse("SEARCH_INDEX_NAME", "audios")
   val SearchDocument = "audio"
+  val SeriesSearchIndex: String = propOrElse("SERIES_SEARCH_INDEX_NAME", "series")
+  val SeriesSearchDocument = "series"
   val AudioTagSearchIndex: String = propOrElse("AUDIO_TAG_SEARCH_INDEX_NAME", "tags-audios")
   val AudioTagSearchDocument = "audio-tag"
   val DefaultPageSize = 10
