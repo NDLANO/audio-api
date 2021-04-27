@@ -8,17 +8,8 @@
 
 package no.ndla.audioapi.controller
 
-import no.ndla.audioapi.AudioApiProperties.{
-  DefaultPageSize,
-  ElasticSearchIndexMaxResultWindow,
-  ElasticSearchScrollKeepAlive,
-  InitialScrollContextKeywords,
-  MaxAudioFileSizeBytes,
-  MaxPageSize,
-  RoleWithWriteAccess
-}
+import no.ndla.audioapi.AudioApiProperties._
 import no.ndla.audioapi.auth.{Role, User}
-import no.ndla.audioapi.model.{Language, Sort}
 import no.ndla.audioapi.model.api.{
   AudioMetaInformation,
   Error,
@@ -32,10 +23,10 @@ import no.ndla.audioapi.model.api.{
   ValidationMessage
 }
 import no.ndla.audioapi.model.domain.{AudioType, SearchSettings}
+import no.ndla.audioapi.model.{Language, Sort, api}
 import no.ndla.audioapi.repository.AudioRepository
 import no.ndla.audioapi.service.search.{AudioSearchService, SearchConverterService}
 import no.ndla.audioapi.service.{Clock, ConverterService, ReadService, WriteService}
-import org.json4s.native.Serialization.read
 import org.json4s.{DefaultFormats, Formats}
 import org.scalatra._
 import org.scalatra.servlet.{FileUploadSupport, MultipartConfig}
@@ -72,10 +63,10 @@ trait AudioController {
 
     configureMultipartHandling(MultipartConfig(maxFileSize = Some(MaxAudioFileSizeBytes)))
 
-    val response400 = ResponseMessage(400, "Validation Error", Some("ValidationError"))
-    val response403 = ResponseMessage(403, "Access Denied", Some("Error"))
-    val response404 = ResponseMessage(404, "Not found", Some("Error"))
-    val response500 = ResponseMessage(500, "Unknown error", Some("Error"))
+    val response400: ResponseMessage = ResponseMessage(400, "Validation Error", Some("ValidationError"))
+    val response403: ResponseMessage = ResponseMessage(403, "Access Denied", Some("Error"))
+    val response404: ResponseMessage = ResponseMessage(404, "Not found", Some("Error"))
+    val response500: ResponseMessage = ResponseMessage(500, "Unknown error", Some("Error"))
 
     case class Param[T](paramName: String, description: String)
 
@@ -165,7 +156,7 @@ trait AudioController {
     get(
       "/",
       operation(
-        apiOperation[SearchResult]("getAudioFiles")
+        apiOperation[SearchResult[api.AudioSummary]]("getAudioFiles")
           .summary("Find audio files")
           .description("Shows all the audio files in the ndla.no database. You can search it too.")
           .parameters(
@@ -200,7 +191,7 @@ trait AudioController {
     post(
       "/search/",
       operation(
-        apiOperation[List[SearchResult]]("getAudioFilesPost")
+        apiOperation[List[SearchResult[api.AudioSummary]]]("getAudioFilesPost")
           .summary("Find audio files")
           .description("Shows all the audio files in the ndla.no database. You can search it too.")
           .parameters(

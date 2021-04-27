@@ -85,7 +85,8 @@ class WriteServiceTest extends UnitSuite with TestEnvironment {
     updated1,
     Seq.empty,
     AudioType.Standard,
-    Seq.empty
+    Seq.empty,
+    None
   )
 
   override def beforeEach(): Unit = {

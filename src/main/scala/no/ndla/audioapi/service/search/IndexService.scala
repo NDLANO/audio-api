@@ -25,6 +25,8 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import scala.util.{Failure, Success, Try}
 
+import cats.implicits._
+
 trait IndexService {
   this: Elastic4sClient with SearchConverterService with AudioRepository =>
 
@@ -91,7 +93,7 @@ trait IndexService {
     def getRanges: Try[List[(Long, Long)]] = {
       val minMaxT = repository.minMaxId
       minMaxT.flatMap {
-        case (minId, maxId) => {
+        case (minId, maxId) =>
           Try {
             Seq
               .range(minId, maxId + 1)
@@ -99,7 +101,6 @@ trait IndexService {
               .map(group => (group.head, group.last))
               .toList
           }
-        }
       }
 
     }
@@ -108,16 +109,16 @@ trait IndexService {
       if (contents.isEmpty) {
         Success(0)
       } else {
-        val requests = contents.flatMap(content => {
-          createIndexRequests(content, indexName)
+        val requests = contents.traverse(content => createIndexRequests(content, indexName))
+        requests.flatMap(rs => {
+          executeRequests(rs.flatten) match {
+            case Success((numSuccessful, numFailures)) =>
+              logger.info(s"Indexed $numSuccessful documents ($searchIndex). No of failed items: $numFailures")
+              Success(contents.size)
+            case Failure(ex) => Failure(ex)
+          }
         })
 
-        executeRequests(requests) match {
-          case Success((numSuccessful, numFailures)) =>
-            logger.info(s"Indexed $numSuccessful documents ($searchIndex). No of failed items: $numFailures")
-            Success(contents.size)
-          case Failure(ex) => Failure(ex)
-        }
       }
     }
 
@@ -172,7 +173,7 @@ trait IndexService {
 
       response match {
         case Success(results) =>
-          Success(results.result.mappings.headOption.map((t) => t._1.name))
+          Success(results.result.mappings.headOption.map(t => t._1.name))
         case Failure(ex) => Failure(ex)
       }
     }

@@ -19,6 +19,7 @@ trait ReadService {
   val readService: ReadService
 
   class ReadService {
+    def seriesWithId(seriesId: Long, language: Option[String]): Try[api.Series] = ???
 
     def getAllTags(input: String, pageSize: Int, page: Int, language: String): Try[api.TagsSearchResult] = {
       val result = tagSearchService.matchingQuery(

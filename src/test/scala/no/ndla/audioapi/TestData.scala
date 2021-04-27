@@ -41,6 +41,7 @@ object TestData {
     updated = new Date(),
     podcastMeta = Seq.empty,
     audioType = AudioType.Standard,
-    manuscript = Seq.empty
+    manuscript = Seq.empty,
+    seriesId = None
   )
 }

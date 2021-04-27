@@ -36,7 +36,8 @@ class ConverterServiceTest extends UnitSuite with TestEnvironment {
     updated,
     Seq.empty,
     AudioType.Standard,
-    Seq.empty
+    Seq.empty,
+    None
   )
 
   test("that toApiAudioMetaInformation converts a domain class to an api class") {

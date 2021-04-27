@@ -17,15 +17,16 @@ import no.ndla.audioapi.model.api.{
   NewAudioMetaInformation,
   SearchParams,
   SearchResult,
+  SeriesSearchParams,
   TagsSearchResult,
   UpdatedAudioMetaInformation,
   ValidationError,
   ValidationException,
   ValidationMessage
 }
-import no.ndla.audioapi.model.domain.{AudioType, SearchSettings}
+import no.ndla.audioapi.model.domain.{AudioType, SearchSettings, SeriesSearchSettings}
 import no.ndla.audioapi.model.{Language, Sort}
-import no.ndla.audioapi.service.search.{AudioSearchService, SearchConverterService}
+import no.ndla.audioapi.service.search.{AudioSearchService, SearchConverterService, SeriesSearchService}
 import no.ndla.audioapi.service.{Clock, ConverterService, ReadService, WriteService}
 import org.json4s.{DefaultFormats, Formats}
 import org.scalatra._
@@ -39,7 +40,7 @@ import scala.util.{Failure, Success, Try}
 trait SeriesController {
   this: ReadService
     with WriteService
-    with AudioSearchService
+    with SeriesSearchService
     with Role
     with User
     with Clock
@@ -143,9 +144,9 @@ trait SeriesController {
     get(
       "/",
       operation(
-        apiOperation[SearchResult]("getAudioFiles")
-          .summary("Find audio files")
-          .description("Shows all the audio files in the ndla.no database. You can search it too.")
+        apiOperation[SearchResult[api.SeriesSummary]]("getSeries")
+          .summary("Find series")
+          .description("Shows all the series. Also searchable.")
           .parameters(
             asHeaderParam(correlationId),
             asQueryParam(query),
@@ -174,28 +175,26 @@ trait SeriesController {
     post(
       "/search/",
       operation(
-        apiOperation[List[SearchResult]]("getAudioFilesPost")
-          .summary("Find audio files")
-          .description("Shows all the audio files in the ndla.no database. You can search it too.")
+        apiOperation[List[SearchResult[api.SeriesSummary]]]("getSeriesPost")
+          .summary("Find series")
+          .description("Shows all the series. Also searchable.")
           .parameters(
             asHeaderParam(correlationId),
-            bodyParam[SearchParams],
+            bodyParam[SeriesSearchParams],
             asQueryParam(scrollId)
           )
           .responseMessages(response400, response500))
     ) {
-      val searchParams = extract[SearchParams](request.body)
+      val searchParams = extract[SeriesSearchParams](request.body)
       scrollSearchOr(searchParams.scrollId, searchParams.language.getOrElse(Language.AllLanguages)) {
         val query = searchParams.query
         val language = searchParams.language
-        val license = searchParams.license
         val sort = searchParams.sort
         val pageSize = searchParams.pageSize
         val page = searchParams.page
         val shouldScroll = searchParams.scrollId.exists(InitialScrollContextKeywords.contains)
-        val atype = searchParams.audioType
 
-        search(query, language, license, sort, pageSize, page, shouldScroll, atype)
+        search(query, language, sort, pageSize, page, shouldScroll)
       }
     }
 
@@ -227,7 +226,7 @@ trait SeriesController {
           )
       }
 
-      audioSearchService.matchingQuery(searchSettings) match {
+      seriesSearchService.matchingQuery(searchSettings) match {
         case Success(searchResult) =>
           val responseHeader = searchResult.scrollId.map(i => this.scrollId.paramName -> i).toMap
           Ok(searchConverterService.asApiSearchResult(searchResult), headers = responseHeader)
@@ -236,36 +235,36 @@ trait SeriesController {
     }
 
     get(
-      "/:audio_id",
+      "/:series_id",
       operation(
-        apiOperation[AudioMetaInformation]("findByAudioId")
-          .summary("Fetch information for audio file")
-          .description("Shows info of the audio with submitted id.")
+        apiOperation[AudioMetaInformation]("findBySeriesId")
+          .summary("Fetch information for series")
+          .description("Shows info of the series with submitted id.")
           .parameters(
             asHeaderParam(correlationId),
-            asPathParam(audioId),
+            asPathParam(this.seriesId),
             asQueryParam(language)
           )
           .responseMessages(response404, response500))
     ) {
-      val id = long(this.audioId.paramName)
+      val id = long(this.seriesId.paramName)
       val language = paramOrNone(this.language.paramName)
 
-      readService.withId(id, language) match {
-        case Some(audio) => audio
-        case None        => NotFound(Error(Error.NOT_FOUND, s"Audio with id $id not found"))
+      readService.seriesWithId(id, language) match {
+        case Success(series) => Ok(series)
+        case Failure(ex)     => errorHandler(ex)
       }
     }
 
     delete(
-      "/:audio_id",
+      "/:series_id",
       operation(
-        apiOperation[Unit]("deleteAudio")
-          .summary("Deletes audio with the specified id")
-          .description("Deletes audio with the specified id")
+        apiOperation[Unit]("deleteSeries")
+          .summary("Deletes series with the specified id")
+          .description("Deletes series with the specified id")
           .parameters(
             asHeaderParam(correlationId),
-            asPathParam(audioId)
+            asPathParam(seriesId)
           )
           .responseMessages(response403, response404, response500)
       )
@@ -273,37 +272,10 @@ trait SeriesController {
       authUser.assertHasId()
       authRole.assertHasRole(RoleWithWriteAccess)
 
-      val audioId = long(this.audioId.paramName)
-      writeService.deleteAudioAndFiles(audioId) match {
+      val seriesId = long(this.seriesId.paramName)
+      writeService.deleteSeries(seriesId) match {
         case Failure(ex) => errorHandler(ex)
-        case Success(_)  => Ok()
-      }
-    }
-
-    delete(
-      "/:audio_id/language/:language",
-      operation(
-        apiOperation[AudioMetaInformation]("deleteLanguage")
-          .summary("Delete language version of audio metadata.")
-          .description("Delete language version of audio metadata.")
-          .parameters(
-            asHeaderParam(correlationId),
-            asPathParam(audioId),
-            asPathParam(pathLanguage)
-          )
-          .authorizations("oauth2")
-          .responseMessages(response400, response403, response500))
-    ) {
-      authUser.assertHasId()
-      authRole.assertHasRole(RoleWithWriteAccess)
-
-      val audioId = long(this.audioId.paramName)
-      val language = params(this.pathLanguage.paramName)
-
-      writeService.deleteAudioLanguageVersion(audioId, language) match {
-        case Failure(ex)          => errorHandler(ex)
-        case Success(Some(image)) => Ok(image)
-        case Success(None)        => NoContent()
+        case Success(_)  => NoContent()
       }
     }
 
@@ -323,7 +295,7 @@ trait SeriesController {
       authUser.assertHasId()
       authRole.assertHasRole(RoleWithWriteAccess)
 
-      val newSeries = extract[api.NewSeries]
+      val newSeries = extract[api.NewSeries](request.body)
 
       writeService.newSeries(newSeries) match {
         case Success(s)  => Created(s)
@@ -349,11 +321,11 @@ trait SeriesController {
       authUser.assertHasId()
       authRole.assertHasRole(RoleWithWriteAccess)
       val id = long(this.seriesId.paramName)
-      val updateSeries = extract[api.NewSeries]
+      val updateSeries = extract[api.NewSeries](request.body)
 
       writeService.updateSeries(id, updateSeries) match {
-        case Success(audioMeta) => audioMeta
-        case Failure(e)         => errorHandler(e)
+        case Success(series) => Ok(series)
+        case Failure(e)      => errorHandler(e)
       }
 
     }

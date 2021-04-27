@@ -3,6 +3,7 @@ package no.ndla.audioapi.service
 import java.io.ByteArrayInputStream
 import com.typesafe.scalalogging.LazyLogging
 import no.ndla.audioapi.model.api._
+import no.ndla.audioapi.model.api
 import no.ndla.audioapi.model.domain.{Audio, LanguageField, WithLanguage}
 import no.ndla.audioapi.repository.AudioRepository
 import no.ndla.audioapi.service.search.{AudioIndexService, TagIndexService}
@@ -25,6 +26,10 @@ trait WriteService {
   val writeService: WriteService
 
   class WriteService extends LazyLogging {
+
+    def updateSeries(id: Long, updateSeries: NewSeries): Try[api.Series] = ???
+    def newSeries(newSeries: NewSeries): Try[api.Series] = ???
+    def deleteSeries(seriesId: Long): Try[Unit] = ???
 
     def deleteAudioLanguageVersion(audioId: Long, language: String): Try[Option[AudioMetaInformation]] =
       audioRepository.withId(audioId) match {
@@ -178,7 +183,8 @@ trait WriteService {
         updated = clock.now(),
         updatedBy = authUser.userOrClientid(),
         podcastMeta = mergeLanguageField(existing.podcastMeta, newPodcastMeta, toUpdate.language),
-        manuscript = mergeLanguageField(existing.manuscript, newManuscript, toUpdate.language)
+        manuscript = mergeLanguageField(existing.manuscript, newManuscript, toUpdate.language),
+        seriesId = existing.seriesId // TODO: Do we do updates here? Do we add episodes to series or series to episodes? /shrug
       )
 
       (merged, savedAudio)
