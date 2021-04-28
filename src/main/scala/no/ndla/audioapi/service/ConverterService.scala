@@ -222,13 +222,15 @@ trait ConverterService {
 
     def toApiSeries(series: domain.Series, language: Option[String]): Try[api.Series] = {
       val title = toApiTitle(findByLanguageOrBestEffort(series.title, language))
+      val coverPhoto = toApiCoverPhoto(series.coverPhoto)
       val episodesT = series.episodes.getOrElse(Seq.empty).traverse(audio => toApiAudioMetaInformation(audio, language))
       episodesT.map(episodes => {
         api.Series(
           id = series.id,
           revision = series.revision,
           title = title,
-          episodes = episodes
+          episodes = episodes,
+          coverPhoto = coverPhoto
         )
       })
 
