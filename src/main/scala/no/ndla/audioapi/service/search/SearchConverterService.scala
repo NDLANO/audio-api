@@ -35,21 +35,13 @@ trait SearchConverterService {
   class SearchConverterService extends LazyLogging {
 
     def asSearchableSeries(s: domain.Series): Try[SearchableSeries] = {
-      s.id match {
-        case None =>
-          Failure(
-            ElasticIndexingException(
-              s"Could not build indexable object for series '${s.toString}', this is a bug."
-            ))
-        case Some(id) =>
-          Success(
-            SearchableSeries(
-              id = id.toString,
-              titles = SearchableLanguageValues(s.title.map(t => LanguageValue(t.language, t.title))),
-              episodes = Seq.empty
-            )
-          )
-      }
+      Success(
+        SearchableSeries(
+          id = s.id.toString,
+          titles = SearchableLanguageValues(s.title.map(t => LanguageValue(t.language, t.title))),
+          episodes = Seq.empty
+        )
+      )
     }
 
     def asSearchableAudioInformation(ai: AudioMetaInformation): SearchableAudioInformation = {

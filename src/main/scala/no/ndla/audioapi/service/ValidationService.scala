@@ -4,6 +4,7 @@ import no.ndla.audioapi.AudioApiProperties
 import no.ndla.audioapi.AudioApiProperties.{creatorTypeMap, processorTypeMap, rightsholderTypeMap}
 import no.ndla.audioapi.integration.DraftApiClient
 import no.ndla.audioapi.model.api.{ValidationException, ValidationMessage}
+import no.ndla.audioapi.model.domain
 import no.ndla.audioapi.model.domain._
 import org.jsoup.Jsoup
 import org.jsoup.safety.Whitelist
@@ -50,9 +51,22 @@ trait ValidationService {
         validateTags(audio.tags, oldLanguages) ++
         validatePodcastMeta(audio.audioType, audio.podcastMeta)
 
-      validationMessages match {
+      validationTry(audio, validationMessages)
+
+    }
+
+    def validate[T <: domain.SeriesWithoutId](series: T): Try[T] = {
+      val validationMessages = validateNonEmpty("title", series.title).toSeq ++
+        series.title.flatMap(title => validateNonEmpty("title", title.language)) ++
+        series.title.flatMap(title => validateTitle("title", title, Seq.empty))
+
+      validationTry(series, validationMessages)
+    }
+
+    private def validationTry[T](successCase: T, messages: Seq[ValidationMessage]): Try[T] = {
+      messages match {
         case head :: tail => Failure(new ValidationException(errors = head :: tail))
-        case _            => Success(audio)
+        case _            => Success(successCase)
       }
     }
 

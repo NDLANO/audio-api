@@ -13,9 +13,11 @@ import no.ndla.audioapi.AudioApiProperties._
 import no.ndla.audioapi.auth.User
 import no.ndla.audioapi.integration.DraftApiClient
 import no.ndla.audioapi.model.Language.{DefaultLanguage, findByLanguageOrBestEffort}
-import no.ndla.audioapi.model.domain.{AudioMetaInformation, AudioType, PodcastMeta}
+import no.ndla.audioapi.model.api.NewSeries
+import no.ndla.audioapi.model.domain.{AudioMetaInformation, AudioType, PodcastMeta, Title}
 import no.ndla.audioapi.model.{Language, api, domain}
 import no.ndla.mapping.License.getLicense
+import cats.implicits._
 
 import scala.util.{Success, Try}
 
@@ -24,6 +26,19 @@ trait ConverterService {
   val converterService: ConverterService
 
   class ConverterService extends LazyLogging {
+
+    def toDomainSeries(newSeries: api.NewSeries): domain.SeriesWithoutId = {
+      val titles = Seq(Title(newSeries.title, newSeries.language))
+      val coverPhoto = domain.CoverPhoto(
+        imageId = newSeries.coverPhotoId,
+        altText = newSeries.coverPhotoAltText
+      )
+
+      new domain.SeriesWithoutId(
+        title = titles,
+        coverPhoto = coverPhoto,
+      )
+    }
 
     def withoutLanguage(audio: AudioMetaInformation, language: String) =
       audio.copy(
@@ -203,6 +218,20 @@ trait ConverterService {
 
     def toDomainAuthor(author: api.Author): domain.Author = {
       domain.Author(author.`type`, author.name)
+    }
+
+    def toApiSeries(series: domain.Series, language: Option[String]): Try[api.Series] = {
+      val title = toApiTitle(findByLanguageOrBestEffort(series.title, language))
+      val episodesT = series.episodes.getOrElse(Seq.empty).traverse(audio => toApiAudioMetaInformation(audio, language))
+      episodesT.map(episodes => {
+        api.Series(
+          id = series.id,
+          revision = series.revision,
+          title = title,
+          episodes = episodes
+        )
+      })
+
     }
   }
 

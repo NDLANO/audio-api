@@ -12,6 +12,7 @@ import com.typesafe.scalalogging.LazyLogging
 import no.ndla.audioapi.integration.DataSource
 import no.ndla.audioapi.model.api.OptimisticLockException
 import no.ndla.audioapi.model.domain.{AudioMetaInformation, Series}
+import no.ndla.audioapi.model.domain
 import org.json4s.Formats
 import org.json4s.native.Serialization._
 import org.postgresql.util.PGobject
@@ -25,7 +26,35 @@ trait SeriesRepository {
   val seriesRepository: SeriesRepository
 
   class SeriesRepository extends LazyLogging with Repository[Series] {
+    val formats: Formats = domain.Series.repositorySerializer
     def withId(id: Long): Try[Option[Series]] = serieWhere(sqls"se.id = $id")
+
+    def deleteWithId(id: Long)(implicit session: DBSession = AutoSession): Try[Int] = {
+      Try {
+        sql"""
+            delete from ${Series.table}
+            where id=$id
+           """
+          .update()
+          .apply()
+      }
+    }
+
+    def insert(newSeries: domain.SeriesWithoutId)(implicit session: DBSession = AutoSession): Try[domain.Series] = {
+      val startRevision = 1
+      val dataObject = new PGobject()
+      dataObject.setType("jsonb")
+      dataObject.setValue(write(newSeries)(formats))
+
+      Try(
+        sql"""
+            insert into ${Series.table}(document, revision)
+            values ($dataObject, $startRevision)
+           """
+          .updateAndReturnGeneratedKey()
+          .apply()
+      ).map(id => Series.fromId(id, startRevision, newSeries))
+    }
 
     override def minMaxId(implicit session: DBSession = ReadOnlyAutoSession): Try[(Long, Long)] = {
       Try(

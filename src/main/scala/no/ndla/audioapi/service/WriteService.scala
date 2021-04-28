@@ -5,7 +5,7 @@ import com.typesafe.scalalogging.LazyLogging
 import no.ndla.audioapi.model.api._
 import no.ndla.audioapi.model.api
 import no.ndla.audioapi.model.domain.{Audio, LanguageField, WithLanguage}
-import no.ndla.audioapi.repository.AudioRepository
+import no.ndla.audioapi.repository.{AudioRepository, SeriesRepository}
 import no.ndla.audioapi.service.search.{AudioIndexService, TagIndexService}
 import org.scalatra.servlet.FileItem
 
@@ -18,6 +18,7 @@ trait WriteService {
   this: ConverterService
     with ValidationService
     with AudioRepository
+    with SeriesRepository
     with AudioIndexService
     with TagIndexService
     with AudioStorageService
@@ -27,9 +28,24 @@ trait WriteService {
 
   class WriteService extends LazyLogging {
 
+    // TODO: Write this function
     def updateSeries(id: Long, updateSeries: NewSeries): Try[api.Series] = ???
-    def newSeries(newSeries: NewSeries): Try[api.Series] = ???
-    def deleteSeries(seriesId: Long): Try[Unit] = ???
+
+    def newSeries(newSeries: NewSeries): Try[api.Series] = {
+      val domainSeries = converterService.toDomainSeries(newSeries)
+      for {
+        validated <- validationService.validate(domainSeries)
+        inserted <- seriesRepository.insert(validated)
+        converted <- converterService.toApiSeries(inserted, Some(newSeries.language))
+      } yield converted
+    }
+
+    def deleteSeries(seriesId: Long): Try[Unit] =
+      seriesRepository.deleteWithId(seriesId) match {
+        case Success(numRows) if numRows > 0 => Success(())
+        case Success(_)                      => Failure(new NotFoundException(s"Could not find id to delete: '$seriesId'"))
+        case Failure(ex)                     => Failure(ex)
+      }
 
     def deleteAudioLanguageVersion(audioId: Long, language: String): Try[Option[AudioMetaInformation]] =
       audioRepository.withId(audioId) match {
