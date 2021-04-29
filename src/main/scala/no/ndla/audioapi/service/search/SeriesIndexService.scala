@@ -44,13 +44,9 @@ trait SeriesIndexService {
       mapping(documentType).fields(
         List(
           intField("id"),
-          keywordField("license"),
           keywordField("defaultTitle"),
-          textField("authors").fielddata(true),
-          keywordField("audioType")
         ) ++
-          generateLanguageSupportedFieldList("titles", keepRaw = true) ++
-          generateLanguageSupportedFieldList("tags")
+          generateLanguageSupportedFieldList("titles", keepRaw = true)
       )
     }
   }

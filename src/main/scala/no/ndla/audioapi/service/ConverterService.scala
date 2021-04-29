@@ -13,7 +13,7 @@ import no.ndla.audioapi.AudioApiProperties._
 import no.ndla.audioapi.auth.User
 import no.ndla.audioapi.integration.DraftApiClient
 import no.ndla.audioapi.model.Language.{DefaultLanguage, findByLanguageOrBestEffort}
-import no.ndla.audioapi.model.api.NewSeries
+import no.ndla.audioapi.model.api.{NewSeries, Tag}
 import no.ndla.audioapi.model.domain.{AudioMetaInformation, AudioType, PodcastMeta, Title}
 import no.ndla.audioapi.model.{Language, api, domain}
 import no.ndla.mapping.License.getLicense
@@ -40,7 +40,7 @@ trait ConverterService {
       )
     }
 
-    def withoutLanguage(audio: AudioMetaInformation, language: String) =
+    def withoutLanguage(audio: AudioMetaInformation, language: String): AudioMetaInformation =
       audio.copy(
         titles = audio.titles.filterNot(_.language == language),
         filePaths = audio.filePaths.filterNot(_.language == language),
@@ -98,7 +98,7 @@ trait ConverterService {
       }
     }
 
-    def toApiTags(maybeTag: Option[domain.Tag]) = {
+    def toApiTags(maybeTag: Option[domain.Tag]): Tag = {
       maybeTag match {
         case Some(tag) => api.Tag(tag.tags, tag.language)
         case None      => api.Tag(Seq(), DefaultLanguage)

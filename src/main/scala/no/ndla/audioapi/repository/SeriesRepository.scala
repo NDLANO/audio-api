@@ -32,8 +32,8 @@ trait SeriesRepository {
     def deleteWithId(id: Long)(implicit session: DBSession = AutoSession): Try[Int] = {
       Try {
         sql"""
-            delete from ${Series.table}
-            where id=$id
+           delete from ${Series.table}
+           where id=$id
            """
           .update()
           .apply()
@@ -48,8 +48,8 @@ trait SeriesRepository {
 
       Try(
         sql"""
-            insert into ${Series.table}(document, revision)
-            values ($dataObject, $startRevision)
+           insert into ${Series.table}(document, revision)
+           values ($dataObject, $startRevision)
            """
           .updateAndReturnGeneratedKey()
           .apply()
@@ -82,11 +82,11 @@ trait SeriesRepository {
 
       Try(
         sql"""
-             select ${se.result.*}, ${au.result.*}
-             from ${Series.as(se)}
-             left join ${AudioMetaInformation.as(au)} on ${se.id} = ${au.seriesId}
-             where $whereClause
-             """
+           select ${se.result.*}, ${au.result.*}
+           from ${Series.as(se)}
+           left join ${AudioMetaInformation.as(au)} on ${se.id} = ${au.seriesId}
+           where $whereClause
+           """
           .one(Series.fromResultSet(se.resultName))
           .toMany(AudioMetaInformation.fromResultSetOpt(au.resultName))
           .map { (series, audios) =>
@@ -105,11 +105,11 @@ trait SeriesRepository {
 
       Try(
         sql"""
-             select ${se.result.*}, ${au.result.*}
-             from ${Series.as(se)}
-             left join ${AudioMetaInformation.as(au)} on ${se.id} = ${au.seriesId}
-             where $whereClause
-             """
+           select ${se.result.*}, ${au.result.*}
+           from ${Series.as(se)}
+           left join ${AudioMetaInformation.as(au)} on ${se.id} = ${au.seriesId}
+           where $whereClause
+           """
           .one(Series.fromResultSet(se.resultName))
           .toMany(AudioMetaInformation.fromResultSetOpt(au.resultName))
           .map { (series, audios) =>

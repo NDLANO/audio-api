@@ -13,6 +13,7 @@ import scala.util.{Failure, Random, Success, Try}
 import java.lang.Math.max
 import no.ndla.audioapi.auth.{Role, User}
 import no.ndla.audioapi.model.domain
+import cats.implicits._
 
 trait WriteService {
   this: ConverterService
@@ -22,6 +23,7 @@ trait WriteService {
     with AudioIndexService
     with TagIndexService
     with AudioStorageService
+    with ReadService
     with Clock
     with User =>
   val writeService: WriteService
@@ -29,16 +31,43 @@ trait WriteService {
   class WriteService extends LazyLogging {
 
     // TODO: Write this function
-    def updateSeries(id: Long, updateSeries: NewSeries): Try[api.Series] = ???
+    def updateSeries(id: Long, updateSeries: api.NewSeries): Try[api.Series] = {
+      val oldSeries = seriesRepository.withId(id)
 
-    def newSeries(newSeries: NewSeries): Try[api.Series] = {
+      val merged: Try[domain.Series] = ??? // TODO: MergeSomehoe
+
+      val oldEpisodesIds: Set[Long] = ???
+      val toDelete = oldEpisodesIds.diff(updateSeries.episodes)
+      val deleted = updateSeriesForEpisodes(None, toDelete.toSeq)
+
+      val newEpisodes = updateSeries.episodes.map(audioRepository.withId)
+
+      // TODO: for-comprehension
+      // TODO: validation
+
+    }
+
+    def newSeries(newSeries: api.NewSeries): Try[api.Series] = {
       val domainSeries = converterService.toDomainSeries(newSeries)
+      val episodes = newSeries.episodes.map(audioRepository.withId)
+
       for {
-        validated <- validationService.validate(domainSeries)
-        inserted <- seriesRepository.insert(validated)
+        _ <- validationService.validateEpisodes(episodes.toSeq)
+        validatedSeries <- validationService.validate(domainSeries)
+        inserted <- seriesRepository.insert(validatedSeries)
+        _ <- updateSeriesForEpisodes(Some(inserted.id), newSeries.episodes)
         converted <- converterService.toApiSeries(inserted, Some(newSeries.language))
       } yield converted
+
     }
+
+    def updateSeriesForEpisodes(seriesId: Option[Long], episodeIds: Seq[Long]): Try[_] =
+      episodeIds.traverse(
+        id =>
+          audioRepository.setSeriesId(
+            audioMetaId = id,
+            seriesId = seriesId
+        ))
 
     def deleteSeries(seriesId: Long): Try[Unit] =
       seriesRepository.deleteWithId(seriesId) match {

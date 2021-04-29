@@ -12,6 +12,7 @@ import scala.util.Try
 class SeriesWithoutId(
     val title: Seq[Title],
     val coverPhoto: CoverPhoto,
+    val episodes: Option[Seq[AudioMetaInformation]],
 )
 
 /** Series with database generated fields. Should match [[SeriesWithoutId]]
@@ -19,10 +20,10 @@ class SeriesWithoutId(
 case class Series(
     id: Long,
     revision: Int,
-    episodes: Option[Seq[AudioMetaInformation]],
+    override val episodes: Option[Seq[AudioMetaInformation]],
     override val title: Seq[Title],
     override val coverPhoto: CoverPhoto,
-) extends SeriesWithoutId(title, coverPhoto)
+) extends SeriesWithoutId(title, coverPhoto, episodes)
 
 object Series extends SQLSyntaxSupport[Series] {
   val jsonEncoder: Formats = DefaultFormats

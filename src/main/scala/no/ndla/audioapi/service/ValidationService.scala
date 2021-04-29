@@ -20,6 +20,11 @@ trait ValidationService {
 
   class ValidationService {
 
+    def validateEpisodes(episodes: Seq[Option[AudioMetaInformation]]): Try[Seq[AudioMetaInformation]] = {
+      // TODO:
+      ???
+    }
+
     def validateAudioFile(audioFile: FileItem): Option[ValidationMessage] = {
       val validMimeTypes = Seq("audio/mp3", "audio/mpeg")
       val actualMimeType = audioFile.getContentType.getOrElse("")

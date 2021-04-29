@@ -84,7 +84,11 @@ trait AudioRepository {
         val newRevision = audioMetaInformation.revision.getOrElse(0) + 1
 
         val count =
-          sql"update audiodata set document = $dataObject, revision = $newRevision where id = $id and revision = ${audioMetaInformation.revision}"
+          sql"""
+             update audiodata
+             set document = $dataObject, revision = $newRevision
+             where id = $id and revision = ${audioMetaInformation.revision}
+             """
             .update()
             .apply()
         if (count != 1) {
@@ -96,6 +100,19 @@ trait AudioRepository {
           Success(audioMetaInformation.copy(id = Some(id), revision = Some(newRevision)))
         }
       }
+    }
+
+    def setSeriesId(audioMetaId: Long, seriesId: Option[Long])(implicit session: DBSession = AutoSession): Try[_] = {
+      // TODO: Do we need to do revision locking here? Prob not, but think about it later
+      Try(
+        sql"""
+           update audiodata
+           set series_id = $seriesId
+           where id = $audioMetaId
+           """
+          .update()
+          .apply()
+      )
     }
 
     def numElements: Int = {
