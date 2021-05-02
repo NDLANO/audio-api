@@ -518,32 +518,4 @@ class WriteServiceTest extends UnitSuite with TestEnvironment {
     verify(audioRepository, times(1)).deleteAudio(eqTo(audioId))(any[DBSession])
   }
 
-  test("That mergeLanguageField merges language fields as expected") {
-    val existingTitles = Seq(domain.Title("Tittel", "nb"), domain.Title("Title", "en"))
-
-    val res1 = writeService.mergeLanguageField(existingTitles, domain.Title("Ny tittel", "nb"))
-    val expected1 = Seq(domain.Title("Ny tittel", "nb"), domain.Title("Title", "en"))
-    res1 should be(expected1)
-
-    val res2 = writeService.mergeLanguageField(existingTitles, domain.Title("Ny tittel", "nn"))
-    val expected2 = Seq(domain.Title("Tittel", "nb"), domain.Title("Title", "en"), domain.Title("Ny tittel", "nn"))
-    res2 should be(expected2)
-  }
-
-  test("That mergeLanguageField deletes language fields as expected") {
-    val existingTitles = Seq(domain.Title("Tittel", "nb"), domain.Title("Title", "en"))
-
-    val res1 = writeService.mergeLanguageField(existingTitles, Some(domain.Title("Ny tittel", "nb")), "nb")
-    val expected1 = Seq(domain.Title("Ny tittel", "nb"), domain.Title("Title", "en"))
-    res1 should be(expected1)
-
-    val res2 = writeService.mergeLanguageField(existingTitles, Some(domain.Title("Ny tittel", "nn")), "nn")
-    val expected2 = Seq(domain.Title("Tittel", "nb"), domain.Title("Title", "en"), domain.Title("Ny tittel", "nn"))
-    res2 should be(expected2)
-
-    val res3 = writeService.mergeLanguageField(existingTitles, None, "en")
-    val expected3 = Seq(domain.Title("Tittel", "nb"))
-    res3 should be(expected3)
-  }
-
 }

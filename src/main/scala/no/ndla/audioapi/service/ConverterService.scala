@@ -14,7 +14,7 @@ import no.ndla.audioapi.auth.User
 import no.ndla.audioapi.integration.DraftApiClient
 import no.ndla.audioapi.model.Language.{DefaultLanguage, findByLanguageOrBestEffort}
 import no.ndla.audioapi.model.api.{NewSeries, Tag}
-import no.ndla.audioapi.model.domain.{AudioMetaInformation, AudioType, PodcastMeta, Title}
+import no.ndla.audioapi.model.domain.{AudioMetaInformation, AudioType, PodcastMeta, Series, Title, WithLanguage}
 import no.ndla.audioapi.model.{Language, api, domain}
 import no.ndla.mapping.License.getLicense
 import cats.implicits._
@@ -27,6 +27,22 @@ trait ConverterService {
 
   class ConverterService extends LazyLogging {
 
+    def updateSeries(existingSeries: domain.Series, updatedSeries: api.NewSeries): domain.Series = {
+      val newTitle = Title(updatedSeries.title, updatedSeries.language)
+      val coverPhoto = domain.CoverPhoto(
+        imageId = updatedSeries.coverPhotoId,
+        altText = updatedSeries.coverPhotoAltText
+      )
+
+      domain.Series(
+        id = existingSeries.id,
+        revision = existingSeries.revision, // TODO: Get this from updatedSeries so we can do optimistic locking
+        episodes = None,
+        title = mergeLanguageField(existingSeries.title, newTitle),
+        coverPhoto = coverPhoto
+      )
+    }
+
     def toDomainSeries(newSeries: api.NewSeries): domain.SeriesWithoutId = {
       val titles = Seq(Title(newSeries.title, newSeries.language))
       val coverPhoto = domain.CoverPhoto(
@@ -37,6 +53,7 @@ trait ConverterService {
       new domain.SeriesWithoutId(
         title = titles,
         coverPhoto = coverPhoto,
+        episodes = None //TODO: Do we add episodes here?
       )
     }
 
@@ -234,6 +251,20 @@ trait ConverterService {
         )
       })
 
+    }
+
+    def mergeLanguageField[T <: WithLanguage](field: Seq[T], toAdd: Option[T], language: String): Seq[T] = {
+      field.indexWhere(_.language == language) match {
+        case idx if idx >= 0 => field.patch(idx, toAdd.toSeq, 1)
+        case _               => field ++ toAdd.toSeq
+      }
+    }
+
+    def mergeLanguageField[Y <: WithLanguage](field: Seq[Y], toMerge: Y): Seq[Y] = {
+      field.indexWhere(_.language == toMerge.language) match {
+        case idx if idx >= 0 => field.patch(idx, Seq(toMerge), 1)
+        case _               => field ++ Seq(toMerge)
+      }
     }
   }
 

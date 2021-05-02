@@ -40,6 +40,34 @@ trait SeriesRepository {
       }
     }
 
+    def update(series: domain.Series)(implicit session: DBSession = AutoSession): Try[domain.Series] = {
+      val dataObject = new PGobject()
+      dataObject.setType("jsonb")
+      dataObject.setValue(write(series)(formats))
+
+      val newRevision = series.revision + 1
+
+      Try(
+        sql"""
+            update ${Series.table}
+            set document=$dataObject, revision=$newRevision
+            where id=${series.id} and revision=${series.revision}
+           """
+          .update()
+          .apply()
+      ) match {
+        case Failure(ex) => Failure(ex)
+        case Success(count) if count != 1 =>
+          val message =
+            s"Found revision mismatch when attempting to update series with id '${series.id}' (rev: ${series.revision})"
+          logger.info(message)
+          Failure(new OptimisticLockException)
+        case Success(_) =>
+          logger.info(s"Updated series with id ${series.id}")
+          Success(series.copy(revision = newRevision))
+      }
+    }
+
     def insert(newSeries: domain.SeriesWithoutId)(implicit session: DBSession = AutoSession): Try[domain.Series] = {
       val startRevision = 1
       val dataObject = new PGobject()

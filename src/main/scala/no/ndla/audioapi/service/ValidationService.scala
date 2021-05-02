@@ -11,8 +11,8 @@ import org.jsoup.safety.Whitelist
 import no.ndla.mapping.ISO639.get6391CodeFor6392CodeMappings
 import no.ndla.mapping.License.getLicense
 import org.scalatra.servlet.FileItem
-
 import scala.util.{Failure, Success, Try}
+import cats.implicits._
 
 trait ValidationService {
   this: DraftApiClient =>
@@ -20,9 +20,41 @@ trait ValidationService {
 
   class ValidationService {
 
-    def validateEpisodes(episodes: Seq[Option[AudioMetaInformation]]): Try[Seq[AudioMetaInformation]] = {
-      // TODO:
-      ???
+    def validatePodcastEpisodes(episodes: Seq[(Long, Option[AudioMetaInformation])]): Try[Seq[AudioMetaInformation]] = {
+      val validated = episodes.map {
+        case (id, Some(ep)) =>
+          validatePodcastEpisode(id, ep) match {
+            case Nil  => Right(ep)
+            case msgs => Left(msgs)
+          }
+        case (id, None) =>
+          Left(
+            Seq(
+              ValidationMessage(
+                s"episodes.$id",
+                s"Provided episode with id '$id' was not found in the database."
+              )))
+      }
+
+      val (errors, eps) = validated.separate
+      val messages = errors.flatten
+
+      if (messages.isEmpty) Success(eps)
+      else Failure(new ValidationException(errors = messages))
+    }
+
+    private def validatePodcastEpisode(episodeId: Long, episode: AudioMetaInformation): Seq[ValidationMessage] = {
+      val correctTypeError =
+        if (episode.audioType != AudioType.Podcast)
+          Seq(
+            ValidationMessage(
+              s"episodes.$episodeId",
+              s"Provided episode $episodeId, is not of '${AudioType.Podcast}' type"
+            ))
+        else Seq.empty
+
+      correctTypeError ++
+        validateNonEmpty(s"episodes.$episodeId.podcastMeta", episode.podcastMeta)
     }
 
     def validateAudioFile(audioFile: FileItem): Option[ValidationMessage] = {
@@ -35,13 +67,10 @@ trait ValidationService {
           s"The file ${audioFile.name} is not a valid audio file. Only valid types are '${validMimeTypes.mkString(",")}', but was '$actualMimeType'"))
       }
 
-      audioFile.name.toLowerCase.endsWith(".mp3") match {
-        case false =>
-          Some(
-            ValidationMessage("files",
-                              s"The file ${audioFile.name} does not have a known file extension. Must be .mp3"))
-        case true => None
-      }
+      if (audioFile.name.toLowerCase.endsWith(".mp3")) None
+      else
+        Some(
+          ValidationMessage("files", s"The file ${audioFile.name} does not have a known file extension. Must be .mp3"))
     }
 
     def validate(audio: AudioMetaInformation, oldAudio: Option[AudioMetaInformation]): Try[AudioMetaInformation] = {

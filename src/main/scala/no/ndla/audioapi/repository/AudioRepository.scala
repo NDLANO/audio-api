@@ -106,7 +106,7 @@ trait AudioRepository {
       // TODO: Do we need to do revision locking here? Prob not, but think about it later
       Try(
         sql"""
-           update audiodata
+           update ${AudioMetaInformation.table}
            set series_id = $seriesId
            where id = $audioMetaId
            """
