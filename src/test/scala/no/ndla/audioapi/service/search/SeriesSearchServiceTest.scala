@@ -10,9 +10,9 @@ package no.ndla.audioapi.service.search
 
 import no.ndla.audioapi.TestData.searchSettings
 import no.ndla.audioapi.integration.{Elastic4sClientFactory, NdlaE4sClient}
-import no.ndla.audioapi.model.Sort
+import no.ndla.audioapi.model.{Sort, domain}
 import no.ndla.audioapi.model.domain._
-import no.ndla.audioapi.{AudioApiProperties, TestEnvironment, UnitSuite}
+import no.ndla.audioapi.{AudioApiProperties, TestData, TestEnvironment, UnitSuite}
 import no.ndla.scalatestsuite.IntegrationSuite
 import org.joda.time.{DateTime, DateTimeZone}
 import org.mockito.invocation.InvocationOnMock
@@ -31,6 +31,7 @@ class SeriesSearchServiceTest
   override val seriesSearchService = new SeriesSearchService
   override val seriesIndexService = new SeriesIndexService
   override val searchConverterService = new SearchConverterService
+  override val converterService = new ConverterService
 
   // Skip tests if no docker environment available
   override def withFixture(test: NoArgTest): Outcome = {
@@ -38,18 +39,46 @@ class SeriesSearchServiceTest
     super.withFixture(test)
   }
 
+  val seriesToIndex = Seq(
+    TestData.SampleSeries.copy(
+      id = 1,
+      title = Seq(domain.Title("Lyd med epler", "nb"))
+    ),
+    TestData.SampleSeries.copy(
+      id = 2,
+      title = Seq(domain.Title("Lyd med tiger", "nb"))
+    )
+  )
+
+  val settings: SeriesSearchSettings = SeriesSearchSettings(
+    query = None,
+    language = None,
+    page = None,
+    pageSize = None,
+    sort = Sort.ByIdAsc,
+    shouldScroll = false
+  )
+
   override def beforeAll(): Unit = {
     super.beforeAll()
 
     if (elasticSearchContainer.isSuccess) {
       seriesIndexService.createIndexWithName(AudioApiProperties.SeriesSearchIndex)
+      seriesToIndex.map(s => seriesIndexService.indexDocument(s).get)
 
-      blockUntil(() => seriesSearchService.countDocuments == 0)
+      blockUntil(() => seriesSearchService.countDocuments == seriesToIndex.size)
     }
   }
 
-  test("Write tests") {
-    ???
+  test("That query search works as expected") {
+    val Success(result1) = seriesSearchService.matchingQuery(settings.copy(query = Some("tiger")))
+    result1.results.map(_.id) should be(Seq(2))
+
+    val Success(result2) = seriesSearchService.matchingQuery(settings.copy(query = Some("Lyd med")))
+    result2.results.map(_.id) should be(Seq(1, 2))
+
+    val Success(result3) = seriesSearchService.matchingQuery(settings.copy(query = Some("epler")))
+    result3.results.map(_.id) should be(Seq(1))
   }
 
   def blockUntil(predicate: () => Boolean): Unit = {
