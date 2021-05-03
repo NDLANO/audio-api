@@ -40,8 +40,7 @@ trait ValidationService {
       val (errors, eps) = validated.separate
       val messages = errors.flatten
 
-      if (messages.isEmpty) Success(eps)
-      else Failure(new ValidationException(errors = messages))
+      validationTry(eps, messages)
     }
 
     private def validatePodcastEpisode(episodeId: Long,

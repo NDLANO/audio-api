@@ -102,8 +102,7 @@ trait AudioRepository {
       }
     }
 
-    def setSeriesId(audioMetaId: Long, seriesId: Option[Long])(implicit session: DBSession = AutoSession): Try[_] = {
-      // TODO: Do we need to do revision locking here? Prob not, but think about it later
+    def setSeriesId(audioMetaId: Long, seriesId: Option[Long])(implicit session: DBSession = AutoSession): Try[Long] = {
       Try(
         sql"""
            update ${AudioMetaInformation.table}
@@ -112,7 +111,7 @@ trait AudioRepository {
            """
           .update()
           .apply()
-      )
+      ).map(_ => audioMetaId)
     }
 
     def numElements: Int = {

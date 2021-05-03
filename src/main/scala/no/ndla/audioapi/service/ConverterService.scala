@@ -36,7 +36,7 @@ trait ConverterService {
 
       domain.Series(
         id = existingSeries.id,
-        revision = existingSeries.revision, // TODO: Get this from updatedSeries so we can do optimistic locking
+        revision = updatedSeries.revision.getOrElse(0),
         episodes = None,
         title = mergeLanguageField(existingSeries.title, newTitle),
         coverPhoto = coverPhoto
@@ -53,7 +53,7 @@ trait ConverterService {
       new domain.SeriesWithoutId(
         title = titles,
         coverPhoto = coverPhoto,
-        episodes = None //TODO: Do we add episodes here?
+        episodes = None
       )
     }
 

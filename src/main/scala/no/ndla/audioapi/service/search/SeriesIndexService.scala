@@ -36,7 +36,7 @@ trait SeriesIndexService {
         case Failure(exception) => Failure(exception)
         case Success(searchable) =>
           val source = write(searchable)
-          Success(Seq(indexInto(indexName / documentType).doc(source).id(domainModel.id.toString))) // TODO: Maybe figure out a way to not do stupid .get's
+          Success(Seq(indexInto(indexName / documentType).doc(source).id(domainModel.id.toString)))
       }
     }
 

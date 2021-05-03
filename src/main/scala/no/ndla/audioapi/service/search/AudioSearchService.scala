@@ -123,7 +123,7 @@ trait AudioSearchService {
       } else {
 
         val searchToExecute =
-          search(AudioApiProperties.SearchIndex)
+          search(searchIndex)
             .size(numResults)
             .from(startAt)
             .query(filteredSearch)

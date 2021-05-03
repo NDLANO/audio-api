@@ -22,7 +22,7 @@ import no.ndla.audioapi.integration.Elastic4sClient
 import no.ndla.audioapi.model.Language._
 import no.ndla.audioapi.model.api.{AudioSummary, ResultWindowTooLargeException, Title}
 import no.ndla.audioapi.model.domain.{SearchSettings, SeriesSearchSettings}
-import no.ndla.audioapi.model.search.SearchableSeries
+import no.ndla.audioapi.model.search.{SearchableLanguageFormats, SearchableSeries}
 import no.ndla.audioapi.model.{Language, api, domain}
 import no.ndla.network.ApplicationUrl
 import org.json4s._
@@ -42,7 +42,7 @@ trait SeriesSearchService {
     override val searchIndex: String = SeriesSearchIndex
 
     override def hitToApiModel(hitString: String, language: String): Try[api.SeriesSummary] = {
-      implicit val formats: DefaultFormats.type = DefaultFormats
+      implicit val formats: Formats = SearchableLanguageFormats.JSonFormats
       val hit = Serialization.read[SearchableSeries](hitString)
 
       val title = findByLanguageOrBestEffort(hit.titles.languageValues, Some(language))
@@ -70,7 +70,6 @@ trait SeriesSearchService {
               boolQuery()
                 .should(
                   languageSpecificSearch("titles", settings.language, query, 2),
-                  languageSpecificSearch("tags", settings.language, query, 1),
                   idsQuery(query)
                 )
             )
@@ -112,7 +111,7 @@ trait SeriesSearchService {
       } else {
 
         val searchToExecute =
-          search(AudioApiProperties.SearchIndex)
+          search(searchIndex)
             .size(numResults)
             .from(startAt)
             .query(filteredSearch)
