@@ -21,10 +21,12 @@ import no.ndla.audioapi.integration.Elastic4sClient
 import no.ndla.audioapi.model.Language._
 import no.ndla.audioapi.model.api.{AudioSummary, ResultWindowTooLargeException, Title}
 import no.ndla.audioapi.model.domain.SearchSettings
+import no.ndla.audioapi.model.search.{SearchableAudioInformation, SearchableLanguageFormats}
 import no.ndla.audioapi.model.{Language, api, domain}
 import no.ndla.network.ApplicationUrl
 import org.json4s._
 import org.json4s.native.JsonMethods._
+import org.json4s.native.Serialization
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -38,29 +40,10 @@ trait AudioSearchService {
 
     override val searchIndex: String = SearchIndex
 
-    override def hitToApiModel(hitString: String, language: String): Try[AudioSummary] = {
-      implicit val formats: DefaultFormats.type = DefaultFormats
-      val hit = parse(hitString)
-
-      val titles = (hit \ "titles").extract[Map[String, String]].map(title => domain.Title(title._2, title._1)).toSeq
-      val supportedLanguages = getSupportedLanguages(titles)
-      val title = findByLanguageOrBestEffort(titles, Some(language)) match {
-        case None    => Title("", language)
-        case Some(x) => Title(x.title, x.language)
-      }
-      val id = (hit \ "id").extract[String].toLong
-      val audioType = (hit \ "audioType").extract[String]
-
-      Success(
-        AudioSummary(
-          id,
-          title,
-          audioType,
-          ApplicationUrl.get + (hit \ "id").extract[String],
-          (hit \ "license").extract[String],
-          supportedLanguages
-        )
-      )
+    override def hitToApiModel(hitString: String, language: String): Try[api.AudioSummary] = {
+      implicit val formats: Formats = SearchableLanguageFormats.JSonFormats
+      val searchable = Serialization.read[SearchableAudioInformation](hitString)
+      searchConverterService.asAudioSummary(searchable, language)
     }
 
     def matchingQuery(settings: SearchSettings): Try[domain.SearchResult[api.AudioSummary]] = {

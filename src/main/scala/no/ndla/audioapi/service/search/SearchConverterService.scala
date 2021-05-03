@@ -11,10 +11,11 @@ package no.ndla.audioapi.service.search
 import com.sksamuel.elastic4s.http.search.SearchHit
 import com.typesafe.scalalogging.LazyLogging
 import no.ndla.audioapi.model.Language
+import no.ndla.audioapi.model.Language.{findByLanguageOrBestEffort, getSupportedLanguages}
 import no.ndla.audioapi.model.domain.{AudioMetaInformation, SearchResult, SearchableTag}
 import no.ndla.audioapi.model.domain
 import no.ndla.audioapi.model.api
-import no.ndla.audioapi.model.api.ElasticIndexingException
+import no.ndla.audioapi.model.api.{AudioSummary, ElasticIndexingException, MissingIdException, Title}
 import no.ndla.audioapi.model.search.{
   LanguageValue,
   SearchableAudioInformation,
@@ -25,6 +26,8 @@ import no.ndla.audioapi.model.search.{
 import no.ndla.audioapi.service.ConverterService
 import no.ndla.mapping.ISO639
 import no.ndla.network.ApplicationUrl
+import org.json4s.DefaultFormats
+import org.json4s.native.JsonMethods
 
 import scala.util.{Failure, Success, Try}
 
@@ -35,13 +38,41 @@ trait SearchConverterService {
   class SearchConverterService extends LazyLogging {
 
     def asSearchableSeries(s: domain.Series): Try[SearchableSeries] = {
+      s.episodes match {
+        case None =>
+          Failure(MissingIdException(s"Series without episodes was passed to `asSearchableSeries`, this is a bug."))
+        case Some(episodes) =>
+          Success(
+            SearchableSeries(
+              id = s.id.toString,
+              titles = SearchableLanguageValues(s.title.map(t => LanguageValue(t.language, t.title))),
+              episodes = episodes.map(asSearchableAudioInformation)
+            )
+          )
+      }
+    }
+
+    def asAudioSummary(searchable: SearchableAudioInformation, language: String): Try[api.AudioSummary] = {
+      val titles = searchable.titles.languageValues.map(lv => domain.Title(lv.value, lv.language))
+      val supportedLanguages = getSupportedLanguages(titles)
+      val title = findByLanguageOrBestEffort(titles, Some(language)) match {
+        case None    => Title("", language)
+        case Some(x) => Title(x.title, x.language)
+      }
+
+      val url = s"${ApplicationUrl.get}${searchable.id}"
+
       Success(
-        SearchableSeries(
-          id = s.id.toString,
-          titles = SearchableLanguageValues(s.title.map(t => LanguageValue(t.language, t.title))),
-          episodes = Seq.empty
+        api.AudioSummary(
+          id = searchable.id.toLong,
+          title = title,
+          audioType = searchable.audioType,
+          url = url,
+          license = searchable.license,
+          supportedLanguages = supportedLanguages
         )
       )
+
     }
 
     def asSearchableAudioInformation(ai: AudioMetaInformation): SearchableAudioInformation = {

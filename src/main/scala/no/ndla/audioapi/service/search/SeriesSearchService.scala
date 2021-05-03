@@ -33,6 +33,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
+import cats.implicits._
+
 trait SeriesSearchService {
   this: Elastic4sClient with AudioIndexService with SearchConverterService with SearchService =>
   val seriesSearchService: SeriesSearchService
@@ -51,14 +53,18 @@ trait SeriesSearchService {
 
       val supportedLanguages = getSupportedLanguages(hit.titles.languageValues)
 
-      Success(
-        api.SeriesSummary(
-          id = hit.id.toLong,
-          title = title,
-          supportedLanguages = supportedLanguages,
-          episodes = Seq.empty // TODO: Episode information should
-        )
-      )
+      hit.episodes.traverse(ep => searchConverterService.asAudioSummary(ep, language)) match {
+        case Failure(ex) => Failure(ex)
+        case Success(episodes) =>
+          Success(
+            api.SeriesSummary(
+              id = hit.id.toLong,
+              title = title,
+              supportedLanguages = supportedLanguages,
+              episodes = episodes
+            )
+          )
+      }
     }
 
     def matchingQuery(settings: SeriesSearchSettings): Try[domain.SearchResult[api.SeriesSummary]] = {
