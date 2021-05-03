@@ -6,7 +6,7 @@ import no.ndla.audioapi.model.api._
 import no.ndla.audioapi.model.api
 import no.ndla.audioapi.model.domain.{Audio, LanguageField, WithLanguage}
 import no.ndla.audioapi.repository.{AudioRepository, SeriesRepository}
-import no.ndla.audioapi.service.search.{AudioIndexService, TagIndexService}
+import no.ndla.audioapi.service.search.{AudioIndexService, SeriesIndexService, TagIndexService}
 import org.scalatra.servlet.FileItem
 
 import scala.util.{Failure, Random, Success, Try}
@@ -21,6 +21,7 @@ trait WriteService {
     with AudioRepository
     with SeriesRepository
     with AudioIndexService
+    with SeriesIndexService
     with TagIndexService
     with AudioStorageService
     with ReadService
@@ -49,6 +50,7 @@ trait WriteService {
             _ <- updateSeriesForEpisodes(None, episodesToDelete.toSeq)
             _ <- updateSeriesForEpisodes(Some(validatedSeries.id), episodesToAdd.toSeq)
             updatedWithEpisodes = updatedSeries.copy(episodes = Some(validatedEpisodes))
+            _ <- seriesIndexService.indexDocument(updatedWithEpisodes)
             converted <- converterService.toApiSeries(updatedWithEpisodes, Some(toUpdateSeries.language))
           } yield converted
 
@@ -65,6 +67,7 @@ trait WriteService {
         inserted <- seriesRepository.insert(validatedSeries)
         _ <- updateSeriesForEpisodes(Some(inserted.id), newSeries.episodes.toSeq)
         insertedWithEpisodes = inserted.copy(episodes = Some(validatedEpisodes))
+        _ <- seriesIndexService.indexDocument(insertedWithEpisodes)
         converted <- converterService.toApiSeries(insertedWithEpisodes, Some(newSeries.language))
       } yield converted
 
