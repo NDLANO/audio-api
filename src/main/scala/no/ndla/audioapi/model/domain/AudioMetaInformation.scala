@@ -85,7 +85,8 @@ object AudioMetaInformation extends SQLSyntaxSupport[AudioMetaInformation] {
     val meta = read[AudioMetaInformation](rs.string(au.c("document")))
     meta.copy(
       id = Some(rs.long(au.c("id"))),
-      revision = Some(rs.int(au.c("revision")))
+      revision = Some(rs.int(au.c("revision"))),
+      seriesId = rs.longOpt(au.c("series_id"))
     )
   }
 

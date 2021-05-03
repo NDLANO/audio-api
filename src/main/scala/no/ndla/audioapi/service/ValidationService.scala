@@ -1,18 +1,18 @@
 package no.ndla.audioapi.service
 
-import no.ndla.audioapi.AudioApiProperties
+import cats.implicits._
 import no.ndla.audioapi.AudioApiProperties.{creatorTypeMap, processorTypeMap, rightsholderTypeMap}
 import no.ndla.audioapi.integration.DraftApiClient
 import no.ndla.audioapi.model.api.{ValidationException, ValidationMessage}
 import no.ndla.audioapi.model.domain
 import no.ndla.audioapi.model.domain._
-import org.jsoup.Jsoup
-import org.jsoup.safety.Whitelist
 import no.ndla.mapping.ISO639.get6391CodeFor6392CodeMappings
 import no.ndla.mapping.License.getLicense
+import org.jsoup.Jsoup
+import org.jsoup.safety.Whitelist
 import org.scalatra.servlet.FileItem
+
 import scala.util.{Failure, Success, Try}
-import cats.implicits._
 
 trait ValidationService {
   this: DraftApiClient =>
@@ -20,10 +20,11 @@ trait ValidationService {
 
   class ValidationService {
 
-    def validatePodcastEpisodes(episodes: Seq[(Long, Option[AudioMetaInformation])]): Try[Seq[AudioMetaInformation]] = {
+    def validatePodcastEpisodes(episodes: Seq[(Long, Option[AudioMetaInformation])],
+                                seriesId: Option[Long]): Try[Seq[AudioMetaInformation]] = {
       val validated = episodes.map {
         case (id, Some(ep)) =>
-          validatePodcastEpisode(id, ep) match {
+          validatePodcastEpisode(id, ep, seriesId) match {
             case Nil  => Right(ep)
             case msgs => Left(msgs)
           }
@@ -43,7 +44,9 @@ trait ValidationService {
       else Failure(new ValidationException(errors = messages))
     }
 
-    private def validatePodcastEpisode(episodeId: Long, episode: AudioMetaInformation): Seq[ValidationMessage] = {
+    private def validatePodcastEpisode(episodeId: Long,
+                                       episode: AudioMetaInformation,
+                                       seriesId: Option[Long]): Seq[ValidationMessage] = {
       val correctTypeError =
         if (episode.audioType != AudioType.Podcast)
           Seq(
@@ -53,8 +56,19 @@ trait ValidationService {
             ))
         else Seq.empty
 
-      correctTypeError ++
-        validateNonEmpty(s"episodes.$episodeId.podcastMeta", episode.podcastMeta)
+      val overrideSeriesIdError = episode.seriesId match {
+        case Some(episodeSeriesId) if !seriesId.contains(episodeSeriesId) =>
+          Some(
+            ValidationMessage(
+              s"episodes.$episodeId",
+              s"Provided episode $episodeId, is already a part of a series (With id: '$episodeSeriesId')."
+            ))
+        case _ => None
+      }
+
+      val hasPodcastMetaError = validateNonEmpty(s"episodes.$episodeId.podcastMeta", episode.podcastMeta)
+
+      correctTypeError ++ overrideSeriesIdError ++ hasPodcastMetaError
     }
 
     def validateAudioFile(audioFile: FileItem): Option[ValidationMessage] = {
@@ -142,12 +156,9 @@ trait ValidationService {
 
     def validateAgreement(copyright: Copyright): Seq[ValidationMessage] = {
       copyright.agreementId match {
-        case Some(id) =>
-          draftApiClient.agreementExists(id) match {
-            case false => Seq(ValidationMessage("copyright.agreement", s"Agreement with id $id does not exist"))
-            case _     => Seq()
-          }
-        case _ => Seq()
+        case Some(id) if !draftApiClient.agreementExists(id) =>
+          Seq(ValidationMessage("copyright.agreement", s"Agreement with id $id does not exist"))
+        case _ => Seq.empty
       }
     }
 
@@ -173,10 +184,10 @@ trait ValidationService {
     }
 
     private def containsNoHtml(fieldPath: String, text: String): Option[ValidationMessage] = {
-      Jsoup.isValid(text, Whitelist.none()) match {
-        case true => None
-        case false =>
-          Some(ValidationMessage(fieldPath, "The content contains illegal html-characters. No HTML is allowed"))
+      if (Jsoup.isValid(text, Whitelist.none())) {
+        None
+      } else {
+        Some(ValidationMessage(fieldPath, "The content contains illegal html-characters. No HTML is allowed"))
       }
     }
 
@@ -201,9 +212,10 @@ trait ValidationService {
     }
 
     private def validateNonEmpty(fieldPath: String, sequence: Seq[Any]): Option[ValidationMessage] = {
-      sequence.nonEmpty match {
-        case true  => None
-        case false => Some(ValidationMessage(fieldPath, "There are no elements to validate."))
+      if (sequence.nonEmpty) {
+        None
+      } else {
+        Some(ValidationMessage(fieldPath, "There are no elements to validate."))
       }
     }
 

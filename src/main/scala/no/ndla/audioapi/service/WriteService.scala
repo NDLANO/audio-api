@@ -42,11 +42,12 @@ trait WriteService {
           val episodesToValidate = toUpdateSeries.episodes.map(id => id -> audioRepository.withId(id))
 
           for {
-            validatedEpisodes <- validationService.validatePodcastEpisodes(episodesToValidate.toSeq)
+            validatedEpisodes <- validationService.validatePodcastEpisodes(episodesToValidate.toSeq,
+                                                                           Some(existingSeries.id))
             validatedSeries <- validationService.validate(merged)
+            updatedSeries <- seriesRepository.update(validatedSeries)
             _ <- updateSeriesForEpisodes(None, episodesToDelete.toSeq)
             _ <- updateSeriesForEpisodes(Some(validatedSeries.id), episodesToAdd.toSeq)
-            updatedSeries <- seriesRepository.update(validatedSeries)
             updatedWithEpisodes = updatedSeries.copy(episodes = Some(validatedEpisodes))
             converted <- converterService.toApiSeries(updatedWithEpisodes, Some(toUpdateSeries.language))
           } yield converted
@@ -59,7 +60,7 @@ trait WriteService {
       val episodes = newSeries.episodes.map(id => id -> audioRepository.withId(id))
 
       for {
-        validatedEpisodes <- validationService.validatePodcastEpisodes(episodes.toSeq)
+        validatedEpisodes <- validationService.validatePodcastEpisodes(episodes.toSeq, None)
         validatedSeries <- validationService.validate(domainSeries)
         inserted <- seriesRepository.insert(validatedSeries)
         _ <- updateSeriesForEpisodes(Some(inserted.id), newSeries.episodes.toSeq)
