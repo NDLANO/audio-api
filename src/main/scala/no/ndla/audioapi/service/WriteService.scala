@@ -81,9 +81,9 @@ trait WriteService {
             seriesId = seriesId
         ))
 
-    def deleteSeries(seriesId: Long): Try[Unit] =
+    def deleteSeries(seriesId: Long): Try[Long] =
       seriesRepository.deleteWithId(seriesId) match {
-        case Success(numRows) if numRows > 0 => Success(())
+        case Success(numRows) if numRows > 0 => seriesIndexService.deleteDocument(seriesId)
         case Success(_)                      => Failure(new NotFoundException(s"Could not find series to delete with id: '$seriesId'"))
         case Failure(ex)                     => Failure(ex)
       }
