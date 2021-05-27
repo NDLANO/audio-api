@@ -57,6 +57,7 @@ trait AudioSearchService {
                   languageSpecificSearch("titles", settings.language, query, 2),
                   languageSpecificSearch("tags", settings.language, query, 1),
                   languageSpecificSearch("manuscript", settings.language, query, 1),
+                  nestedLanguageQuery("podcastMeta", "introduction", settings.language, query, 1),
                   idsQuery(query)
                 )
             )
@@ -64,6 +65,25 @@ trait AudioSearchService {
       }
 
       executeSearch(settings, fullSearch)
+    }
+
+    private def nestedLanguageQuery(nestedField: String,
+                                    subField: String,
+                                    language: Option[String],
+                                    query: String,
+                                    boost: Float) = {
+      val langQuery = language match {
+        case None | Some(Language.AllLanguages) | Some("*") => None
+        case Some(l)                                        => Some(termQuery(s"$nestedField.language", l))
+      }
+
+      nestedQuery("podcastMeta",
+                  boolQuery().must(
+                    Seq(
+                      Some(simpleStringQuery(query).field(s"$nestedField.$subField", boost)),
+                      langQuery
+                    ).flatten,
+                  ))
     }
 
     private def languageSpecificSearch(searchField: String,
