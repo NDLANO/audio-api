@@ -17,6 +17,7 @@ import scala.util.{Failure, Success}
 class WriteServiceTest extends UnitSuite with TestEnvironment {
   override val writeService = new WriteService
   override val converterService = new ConverterService
+
   val (newFileName1, newFileName2) = ("AbCdeF.mp3", "GhijKl.mp3")
   val newAudioFile1: NewAudioFile = NewAudioFile("test.mp3", "nb")
   val newAudioFile2: NewAudioFile = NewAudioFile("test2.mp3", "nb")
@@ -44,7 +45,8 @@ class WriteServiceTest extends UnitSuite with TestEnvironment {
     audioType = None,
     podcastMeta = None,
     manuscript = None,
-    seriesId = None
+    seriesId = None,
+    audioFile = None
   )
 
   val updated: Date = new DateTime(2017, 4, 1, 12, 15, 32, DateTimeZone.UTC).toDate
@@ -269,6 +271,7 @@ class WriteServiceTest extends UnitSuite with TestEnvironment {
                                                None,
                                                None,
                                                None,
+                                               None,
                                                None)
     val (merged, _) = writeService.mergeAudioMeta(domainAudioMeta, toUpdate, None).get
     merged.titles.length should be(1)
@@ -283,6 +286,7 @@ class WriteServiceTest extends UnitSuite with TestEnvironment {
                                                "nb",
                                                converterService.toApiCopyright(domainAudioMeta.copyright),
                                                Seq(),
+                                               None,
                                                None,
                                                None,
                                                None,
@@ -301,6 +305,7 @@ class WriteServiceTest extends UnitSuite with TestEnvironment {
                                                "en",
                                                converterService.toApiCopyright(domainAudioMeta.copyright),
                                                Seq(),
+                                               None,
                                                None,
                                                None,
                                                None,
@@ -324,6 +329,7 @@ class WriteServiceTest extends UnitSuite with TestEnvironment {
                                                None,
                                                None,
                                                None,
+                                               None,
                                                None)
     val (merged, _) = writeService.mergeAudioMeta(domainAudioMeta, toUpdate, Some(newAudio)).get
     merged.titles.length should be(1)
@@ -343,6 +349,7 @@ class WriteServiceTest extends UnitSuite with TestEnvironment {
                                                "nb",
                                                converterService.toApiCopyright(domainAudioMeta.copyright),
                                                Seq(),
+                                               None,
                                                None,
                                                None,
                                                None,
@@ -774,6 +781,39 @@ class WriteServiceTest extends UnitSuite with TestEnvironment {
     result.isSuccess should be(true)
 
     verify(audioRepository, times(0)).setSeriesId(any[Long], any[Option[Long]])(any[DBSession])
+  }
+
+  test("Updating with file from another language will create a new copy of it") {
+    println("====CORRECT TEST====")
+    // mock path of updated file
+    val newFilePath = "xyz1.mp3"
+    // Audio of other language
+    val updatedAudio = api.Audio("file1.mp3", "audio/mpeg", 1024, "nb")
+    // Full update object
+    val updatedMeta = updatedAudioMeta.copy(language = "sma", audioFile = Some(updatedAudio))
+    // Expected object after update
+    val afterInsert = multiLangAudio.copy(
+      titles = multiLangAudio.titles ++ List(domain.Title("title", "sma")),
+      filePaths = multiLangAudio.filePaths ++ List(domain.Audio("xyz1.mp3", "audio/mpeg", 1024, "sam")),
+      tags = multiLangAudio.tags ++ List(domain.Tag(List("seq"), "sma"))
+    )
+
+    when(audioRepository.withId(4)).thenReturn(Some(multiLangAudio))
+    when(
+      validationService.validate(any[domain.AudioMetaInformation],
+                                 any[Option[domain.AudioMetaInformation]],
+                                 any[Option[domain.Series]]))
+      .thenReturn(Success(multiLangAudio))
+    when(audioRepository.setSeriesId(any, any)(any)).thenReturn(Success(4))
+    when(audioRepository.update(any[domain.AudioMetaInformation], any[Long])).thenReturn(Success(afterInsert))
+    when(audioIndexService.indexDocument(any[domain.AudioMetaInformation])).thenReturn(Success(afterInsert))
+    when(tagIndexService.indexDocument(any[domain.AudioMetaInformation])).thenReturn(Success(afterInsert))
+    when(audioStorage.cloneObject(any[String],any[String])).thenReturn(Success(s3ObjectMock))
+
+    val result = writeService.updateAudio(4, updatedMeta, None)
+    result.isSuccess should be(true)
+
+    verify(audioStorage, times(1)).cloneObject(any[String], any[String])
   }
 
 }

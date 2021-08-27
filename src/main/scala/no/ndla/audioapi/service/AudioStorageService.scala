@@ -9,9 +9,9 @@
 package no.ndla.audioapi.service
 
 import java.io.InputStream
-
-import com.amazonaws.services.s3.model.{ObjectMetadata, PutObjectRequest}
+import com.amazonaws.services.s3.model.{CopyObjectRequest, ObjectMetadata, PutObjectRequest}
 import no.ndla.audioapi.AudioApiProperties.StorageName
+import no.ndla.audioapi.ComponentRegistry.writeService.randomFileName
 import no.ndla.audioapi.integration.AmazonClient
 
 import scala.util.{Failure, Success, Try}
@@ -44,5 +44,13 @@ trait AudioStorageService {
 
     def deleteObject(storageKey: String): Try[Unit] = Try(amazonClient.deleteObject(StorageName, storageKey))
 
+    def cloneObject(storageKey: String, destinationKey: String): Try[ObjectMetadata] = {
+      val request = new CopyObjectRequest(StorageName, storageKey, StorageName, destinationKey)
+
+      Try(amazonClient.copyObject(request)) match {
+        case Success(_)         => getObjectMetaData(destinationKey)
+        case Failure(exception) => Failure(exception)
+      }
+    }
   }
 }

@@ -241,6 +241,7 @@ trait WriteService {
     def updateAudio(id: Long,
                     metadataToUpdate: api.UpdatedAudioMetaInformation,
                     fileOpt: Option[FileItem]): Try[api.AudioMetaInformation] = {
+
       audioRepository.withId(id) match {
         case None => Failure(new NotFoundException)
         case Some(existingMetadata) =>
@@ -305,8 +306,19 @@ trait WriteService {
         existing: domain.AudioMetaInformation,
         toUpdate: api.UpdatedAudioMetaInformation,
         savedAudio: Option[Audio]): Try[(domain.AudioMetaInformation, Option[Audio])] = {
+
       val mergedFilePaths = savedAudio match {
-        case None => existing.filePaths
+        case None =>
+          toUpdate.audioFile match {
+            case Some(audio) =>
+              if (!audio.language.equals(toUpdate.language)) {
+                val clonedFile = cloneFile(audio.url, toUpdate.language)
+                existing.filePaths ++ Seq(clonedFile.get)
+              }
+              existing.filePaths
+
+            case None => existing.filePaths
+          }
         case Some(audio) =>
           converterService.mergeLanguageField(
             existing.filePaths,
@@ -366,6 +378,15 @@ trait WriteService {
       audioStorage
         .storeAudio(new ByteArrayInputStream(file.get()), contentType, file.size, fileName)
         .map(objectMeta => Audio(fileName, objectMeta.getContentType, objectMeta.getContentLength, language))
+    }
+
+    private[service] def cloneFile(filePath: String, language: String): Try[Audio] = {
+      val fileExtension = getFileExtension(filePath).getOrElse("")
+      val newFilePath = LazyList.continually(randomFileName(fileExtension)).dropWhile(audioStorage.objectExists).head
+
+      audioStorage
+        .cloneObject(filePath, newFilePath)
+        .map(objectMeta => Audio(newFilePath, objectMeta.getContentType, objectMeta.getContentLength, language))
     }
 
     private[service] def randomFileName(extension: String, length: Int = 12): String = {
