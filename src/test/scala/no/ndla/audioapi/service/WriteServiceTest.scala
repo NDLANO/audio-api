@@ -808,7 +808,7 @@ class WriteServiceTest extends UnitSuite with TestEnvironment {
     when(audioRepository.update(any[domain.AudioMetaInformation], any[Long])).thenReturn(Success(afterInsert))
     when(audioIndexService.indexDocument(any[domain.AudioMetaInformation])).thenReturn(Success(afterInsert))
     when(tagIndexService.indexDocument(any[domain.AudioMetaInformation])).thenReturn(Success(afterInsert))
-    when(audioStorage.cloneObject(any[String],any[String])).thenReturn(Success(s3ObjectMock))
+    when(audioStorage.cloneObject(any[String], any[String])).thenReturn(Success(s3ObjectMock))
 
     val result = writeService.updateAudio(4, updatedMeta, None)
     result.isSuccess should be(true)
